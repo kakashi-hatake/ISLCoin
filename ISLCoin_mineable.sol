@@ -1,6 +1,9 @@
-pragma solidity ^0.4.16;
+pragma solidity >=0.4.22 <0.6.0;
 
-interface tokenRecipient { function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) external; }
+interface tokenRecipient { 
+    function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) external; 
+
+}
 
 contract TokenERC20 {
     // Public variables of the token
@@ -155,4 +158,25 @@ contract TokenERC20 {
         emit Burn(_from, _value);
         return true;
     }
+    
+        bytes32 public currentChallenge;    // The coin starts with a challenge
+    uint public timeOfLastProof;        // Variable to keep track of when rewards were given
+    uint public difficulty = 10**32;    // Difficulty starts reasonably low
+
+    function proofOfWork(uint nonce) public {
+        // Generate a random hash based on input
+        bytes32 n = bytes32(keccak256(abi.encodePacked(nonce, currentChallenge)));
+        require(n >= bytes32(difficulty));                                  // Check if it's under the difficulty
+
+        uint timeSinceLastProof = (now - timeOfLastProof);                  // Calculate time since last reward was given
+        require(timeSinceLastProof >=  5 seconds);                          // Rewards cannot be given too quickly
+        balanceOf[msg.sender] += timeSinceLastProof / 60 seconds;           // The reward to the winner grows by the minute
+
+        difficulty = difficulty * 10 minutes / timeSinceLastProof + 1;      // Adjusts the difficulty
+        timeOfLastProof = now;                                              // Reset the counter
+        
+        // Save a hash that will be used as the next proof
+        currentChallenge = keccak256(abi.encodePacked(nonce, currentChallenge, blockhash(block.number - 1)));
+    }
 }
+
